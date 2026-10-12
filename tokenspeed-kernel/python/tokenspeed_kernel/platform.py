@@ -84,6 +84,11 @@ def _prepend_env_path(name: str, path: Path) -> None:
         os.environ[name] = os.pathsep.join([value, *entries])
 
 
+def _xpu_is_available() -> bool:
+    """Return whether PyTorch can see an Intel GPU (XPU) device."""
+    return hasattr(torch, "xpu") and torch.xpu.is_available()
+
+
 def _npu_is_available() -> bool:
     """Return whether torch-npu is installed and an Ascend device is visible."""
     try:
@@ -135,7 +140,7 @@ class InterconnectInfo:
 class PlatformInfo:
     """Complete description of a compute platform."""
 
-    vendor: str  # "nvidia", "amd", "ascend"
+    vendor: str  # "nvidia", "amd", "ascend", "intel"
     arch_version: ArchVersion
     device_name: str
     device_count: int
@@ -188,6 +193,10 @@ class PlatformInfo:
     @property
     def is_npu(self) -> bool:
         return self.vendor == "ascend"
+
+    @property
+    def is_xpu(self) -> bool:
+        return self.vendor == "intel"
 
     @property
     def is_cdna4(self) -> bool:
@@ -422,8 +431,12 @@ def _detect_platform() -> PlatformInfo:
     if _npu_is_available():
         return _detect_npu_platform()
 
+    if _xpu_is_available():
+        return _detect_xpu_platform()
+
     raise RuntimeError(
-        "tokenspeed-kernel requires an NVIDIA CUDA, AMD ROCm, or Ascend NPU device."
+        "tokenspeed-kernel requires an NVIDIA CUDA, AMD ROCm, Ascend NPU, "
+        "or Intel XPU device."
     )
 
 
@@ -442,6 +455,27 @@ def _detect_npu_platform() -> PlatformInfo:
         max_shared_memory_per_sm=0,
         sm_features=frozenset({"tensor_core:f16", "tensor_core:bf16"}),
         runtime_features=frozenset({"runtime:acl_graph"}),
+        interconnect=InterconnectInfo(topology="single_gpu"),
+    )
+
+
+def _detect_xpu_platform() -> PlatformInfo:
+    """Detect an Intel GPU platform exposed through PyTorch XPU."""
+    props = torch.xpu.get_device_properties(torch.xpu.current_device())
+    # props.version is the GPU IP version, e.g. "20.1.0" on BMG (Xe2).
+    major, minor = (int(part) for part in props.version.split(".")[:2])
+    return PlatformInfo(
+        vendor="intel",
+        arch_version=ArchVersion(major, minor),
+        device_name=props.name,
+        device_count=torch.xpu.device_count(),
+        total_memory=props.total_memory,
+        memory_bandwidth=0.0,
+        sm_count=props.max_compute_units,
+        max_threads_per_sm=0,
+        max_shared_memory_per_sm=props.local_mem_size,
+        sm_features=frozenset(),
+        runtime_features=frozenset(),
         interconnect=InterconnectInfo(topology="single_gpu"),
     )
 
