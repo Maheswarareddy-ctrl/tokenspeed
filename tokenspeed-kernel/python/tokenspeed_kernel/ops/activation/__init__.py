@@ -33,6 +33,11 @@ from tokenspeed_kernel.ops.gemm import _fp8_linear_activation
 from tokenspeed_kernel.platform import current_platform, pdl_enabled
 from tokenspeed_kernel.registry import error_fn
 
+if current_platform().is_xpu:
+    from tokenspeed_kernel.ops.activation.sycl import silu_and_mul as sycl_silu_and_mul
+else:
+    sycl_silu_and_mul = error_fn
+
 
 def silu_and_mul(
     x: torch.Tensor,
@@ -43,8 +48,11 @@ def silu_and_mul(
 
     Positive ``limit`` values use the portable Triton implementation because
     the CUDA implementation does not expose the checkpoint's clamp semantics.
+    On Intel XPU both forms run the sgl-kernel-xpu SYCL kernels.
 
     """
+    if current_platform().is_xpu:
+        return sycl_silu_and_mul(x, out, limit=limit)
     if (
         limit is not None
         or current_platform().is_amd
