@@ -54,12 +54,12 @@ class SiluAndMul(torch.nn.Module):
             raise ValueError(
                 f"SwiGLU expects an even [gate, up] width, got {x.shape[-1]}"
             )
-        if not x.is_cuda:
+        if not (x.is_cuda or x.is_xpu):
             if fp8_out:
                 raise NotImplementedError("CPU fp8_out silu_and_mul is not implemented")
             return self.forward_native(x)
 
-        if not _is_amd:
+        if not _is_amd and not x.is_xpu:
 
             def get_tma_aligned_scale(x):
                 aligned_size = (x.shape[-2] + 3) // 4 * 4
@@ -95,7 +95,10 @@ class SiluAndMul(torch.nn.Module):
             )
 
         if fp8_out:
-            raise NotImplementedError("AMD fp8_out silu_and_mul is not implemented")
+            raise NotImplementedError(
+                "AMD and XPU fp8_out silu_and_mul is not implemented"
+            )
+
         d = x.shape[-1] // 2
         out = torch.empty(x.shape[:-1] + (d,), dtype=x.dtype, device=x.device)
         return silu_and_mul(
