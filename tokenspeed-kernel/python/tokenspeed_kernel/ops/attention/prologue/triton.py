@@ -342,7 +342,7 @@ def _block_tokens(num_tokens: int, block: int) -> int:
     "gqa_prologue",
     name="triton_gqa_prologue",
     solution="triton",
-    capability=CapabilityRequirement(vendors=frozenset({"amd", "nvidia"})),
+    capability=CapabilityRequirement(vendors=frozenset({"amd", "intel", "nvidia"})),
     signatures=format_signatures(("q",), "dense", {torch.float16, torch.bfloat16}),
     priority=Priority.PERFORMANT,
     traits={
