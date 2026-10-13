@@ -6,6 +6,10 @@ TokenSpeed. The operators wrap the SYCL kernels from
 in a standalone package mirrors the AMD and NPU package layouts and keeps the
 TokenSpeed runtime vendor-neutral.
 
+On XPU, `tokenspeed-kernel` imports Triton through this package, which uses
+the Intel Triton distribution (`triton-xpu`), so TokenSpeed's Triton code
+finds the XPU driver.
+
 TokenSpeed applications should continue to import operators from
 `tokenspeed-kernel`; it owns registration and dispatch to this package.
 

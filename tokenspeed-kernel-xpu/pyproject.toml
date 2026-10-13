@@ -12,6 +12,7 @@ license = { file = "LICENSE" }
 dependencies = [
     "torch",
     "sglang-kernel-xpu",
+    "triton-xpu",
 ]
 
 [project.urls]

@@ -35,9 +35,12 @@ from tokenspeed_triton.language.core import _aggregate as aggregate
 from tokenspeed_triton.tools.tensor_descriptor import TensorDescriptor
 
 _IS_NPU = hasattr(torch, "npu") and torch.npu.is_available()
+_IS_XPU = hasattr(torch, "xpu") and torch.xpu.is_available()
 
 if _IS_NPU:
     from tokenspeed_kernel_npu._triton import libdevice, proton, tl, triton
+elif _IS_XPU:
+    from tokenspeed_kernel_xpu._triton import libdevice, proton, tl, triton
 else:
     import tokenspeed_triton as triton
     from tokenspeed_triton import language as tl
