@@ -149,10 +149,10 @@ def get_available_gpu_memory(
     device, gpu_id, distributed=False, empty_cache=True, cpu_group=None
 ):
     """
-    Get available memory for cuda:gpu_id device.
+    Get available memory for the gpu_id device (CUDA, NPU or XPU).
     When distributed is True, the available memory is the minimum available memory of all GPUs.
     """
-    if device in {"cuda", "npu"}:
+    if device in {"cuda", "npu", "xpu"}:
         device_module = torch.get_device_module(device)
         num_gpus = device_module.device_count()
         if gpu_id >= num_gpus:

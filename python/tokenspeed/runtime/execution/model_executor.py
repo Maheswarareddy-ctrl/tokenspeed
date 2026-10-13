@@ -664,7 +664,13 @@ class ModelExecutor:
         # placed by the consumer: each forward waits on the default stream in
         # its prologue; zeroing and write-back wait on the execution stream
         # themselves.
-        self.default_stream = self.device_module.default_stream(self.device)
+        if self.device_module is torch.xpu:
+            # torch.xpu has no default_stream(); at startup the current stream
+            # is the device's default stream.
+            self.default_stream = self.device_module.current_stream(self.device)
+        else:
+            self.default_stream = self.device_module.default_stream(self.device)
+
         self.execution_stream = self.device_module.Stream()
         # The data plane: every CUDA-touching operation after startup is
         # submitted here and runs in FIFO order on one thread. The event loop
@@ -1872,7 +1878,7 @@ class ModelExecutor:
                     sanitized = sanitize(draft_pool, draft_pages) or sanitized
         if not sanitized:
             return None
-        if torch.device(self.device).type not in {"cuda", "npu"}:
+        if torch.device(self.device).type not in {"cuda", "npu", "xpu"}:
             return None
         done = self.device_module.Event()
         done.record(self.default_stream)

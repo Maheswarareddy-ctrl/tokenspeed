@@ -5,7 +5,7 @@ import torch
 
 from tokenspeed.runtime.distributed.comm_backend import hccl as hccl_module
 from tokenspeed.runtime.distributed.comm_backend import registry
-from tokenspeed.runtime.distributed.comm_backend.hccl import HcclBackend
+from tokenspeed.runtime.distributed.comm_backend.hccl import HcclBackend, XcclBackend
 
 
 def test_registry_selects_hccl_on_npu(monkeypatch):
@@ -33,6 +33,38 @@ def test_hccl_all_reduce_uses_hccl_process_group(monkeypatch):
 
     assert output is tensor
     get_process_group.assert_called_once_with("hccl", (0, 1))
+    all_reduce.assert_called_once_with(
+        tensor,
+        op=torch.distributed.ReduceOp.SUM,
+        group=process_group,
+    )
+
+
+def test_registry_selects_xccl_on_xpu(monkeypatch):
+    monkeypatch.setattr(registry, "_global_backend", None)
+    monkeypatch.setattr(
+        registry,
+        "current_platform",
+        lambda: SimpleNamespace(is_npu=False, is_xpu=True),
+    )
+
+    backend = registry.initialize_comm_backend()
+
+    assert isinstance(backend, XcclBackend)
+
+
+def test_xccl_all_reduce_uses_xccl_process_group(monkeypatch):
+    process_group = Mock()
+    get_process_group = Mock(return_value=process_group)
+    all_reduce = Mock()
+    monkeypatch.setattr(hccl_module.pg_manager, "get_process_group", get_process_group)
+    monkeypatch.setattr(hccl_module.dist, "all_reduce", all_reduce)
+    tensor = torch.ones(4)
+
+    output = XcclBackend().all_reduce(tensor, (0, 1))
+
+    assert output is tensor
+    get_process_group.assert_called_once_with("xccl", (0, 1))
     all_reduce.assert_called_once_with(
         tensor,
         op=torch.distributed.ReduceOp.SUM,

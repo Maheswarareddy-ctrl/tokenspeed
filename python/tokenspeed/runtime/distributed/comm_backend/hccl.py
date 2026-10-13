@@ -32,9 +32,12 @@ from tokenspeed.runtime.distributed.process_group_manager import (
 class HcclBackend(CommBackend):
     """Collectives implemented by torch.distributed over HCCL."""
 
-    @staticmethod
-    def _process_group(group: Group):
-        return pg_manager.get_process_group("hccl", group)
+    # The torch.distributed backend whose process groups carry the collectives.
+    process_group_backend = "hccl"
+
+    @classmethod
+    def _process_group(cls, group: Group):
+        return pg_manager.get_process_group(cls.process_group_backend, group)
 
     def all_reduce(
         self,
@@ -183,3 +186,9 @@ class HcclBackend(CommBackend):
         tensor = torch.empty(size, dtype=dtype, device=device)
         dist.recv(tensor, group[src], group=self._process_group(group))
         return tensor
+
+
+class XcclBackend(HcclBackend):
+    """The same torch.distributed collectives over XCCL (Intel oneCCL)."""
+
+    process_group_backend = "xccl"

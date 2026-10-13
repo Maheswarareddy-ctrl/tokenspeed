@@ -156,6 +156,8 @@ class DistributedInitializer:
             backend = "nccl"
         elif config.device == "npu":
             backend = "hccl"
+        elif config.device == "xpu":
+            backend = "xccl"
         else:
             raise ValueError(f"Unsupported device: {config.device}")
 
@@ -168,8 +170,12 @@ class DistributedInitializer:
         # Pass the device so PyTorch binds the process group to it (eager NCCL
         # init) instead of inferring it later — this also mutes the c10d
         # "barrier(): using the device under current context" warning.
+        # HCCL and XCCL are left unbound: a bound group also binds the gloo
+        # subgroups to the device, and gloo has no NPU or XPU backend.
         device_id = (
-            None if backend == "hccl" else torch.device(config.device, config.gpu_id)
+            None
+            if backend in ("hccl", "xccl")
+            else torch.device(config.device, config.gpu_id)
         )
 
         if config.emulate_rank_zero:

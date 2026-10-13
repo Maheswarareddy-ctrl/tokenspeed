@@ -140,7 +140,7 @@ class ForwardThread:
         self._device_type: str | None = None
         self._device_index: int | None = None
         resolved = torch.device(device)
-        if resolved.type in {"cuda", "npu"}:
+        if resolved.type in {"cuda", "npu", "xpu"}:
             device_module = torch.get_device_module(resolved.type)
             self._device_type = resolved.type
             self._device_index = (

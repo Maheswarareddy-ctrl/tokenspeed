@@ -38,7 +38,12 @@ def initialize_comm_backend(use_pynccl: bool = False) -> CommBackend:
         from tokenspeed.runtime.distributed.comm_backend.hccl import HcclBackend
 
         _global_backend = HcclBackend()
+    elif current_platform().is_xpu:
+        from tokenspeed.runtime.distributed.comm_backend.hccl import XcclBackend
+
+        _global_backend = XcclBackend()
     else:
+
         from tokenspeed.runtime.distributed.comm_backend.auto import AutoBackend
 
         _global_backend = AutoBackend()
