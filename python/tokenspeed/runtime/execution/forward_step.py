@@ -509,11 +509,13 @@ class ForwardStepRunner:
         observer: AbstractContextManager[None],
         variant: str = CUDA_GRAPH_VARIANT_DEFAULT,
     ):
-        graph_cls = (
-            self.device_module.NPUGraph
-            if self.device == "npu"
-            else self.device_module.CUDAGraph
-        )
+        if self.device == "npu":
+            graph_cls = self.device_module.NPUGraph
+        elif self.device == "xpu":
+            graph_cls = self.device_module.XPUGraph
+        else:
+            graph_cls = self.device_module.CUDAGraph
+
         graph = graph_cls()
         self._prepare_request_token_history_graph_inputs(active_bs=0, padded_bs=bs)
 

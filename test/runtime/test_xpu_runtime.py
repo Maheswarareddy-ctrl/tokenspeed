@@ -23,6 +23,8 @@
 # SOFTWARE.
 
 import argparse
+import contextlib
+from unittest import mock
 
 import pytest
 import torch
@@ -36,6 +38,7 @@ import tokenspeed_kernel._triton as kernel_triton  # noqa: E402
 
 from tokenspeed.runtime.configs.device_config import DeviceConfig  # noqa: E402
 from tokenspeed.runtime.execution.device import _NoDeviceWork  # noqa: E402
+from tokenspeed.runtime.execution.forward_step import ForwardStepRunner  # noqa: E402
 from tokenspeed.runtime.sampling.backends.base import (  # noqa: E402
     SamplingBackendConfig,
 )
@@ -90,3 +93,19 @@ def test_triton_sampling_backend_builds_on_xpu() -> None:
         device="xpu",
     )
     TritonSamplingBackend(config)  # used to crash on torch.cuda
+
+
+def test_decode_graph_capture_records_an_xpu_graph() -> None:
+    runner = ForwardStepRunner.__new__(ForwardStepRunner)
+    runner.device = "xpu"
+    runner.device_module = torch.xpu
+
+    class _Recorded(Exception):
+        pass
+
+    def _xpu_graph():
+        raise _Recorded
+
+    with mock.patch.object(torch.xpu, "XPUGraph", _xpu_graph):
+        with pytest.raises(_Recorded):
+            runner._capture_one(1, observer=contextlib.nullcontext())
