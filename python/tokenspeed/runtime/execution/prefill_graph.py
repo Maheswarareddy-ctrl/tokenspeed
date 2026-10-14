@@ -836,7 +836,8 @@ class PrefillGraph:
         for _ in range(self.num_warmup):
             spec = _output_spec(CapturedForward(*self._run_inner(bucket)))
         self._reserve_outputs(spec)
-        torch.cuda.synchronize()
+        torch.get_device_module().synchronize()
+
         stream = decode_wrapper.stream if decode_wrapper is not None else None
         cap = BreakableCapture(
             pool=self._pool, stream=stream, handoff_storage=self._handoff_storage
@@ -857,7 +858,7 @@ class PrefillGraph:
         """Warm up and capture the encoder stage for ``bucket`` from the buffers."""
         for _ in range(self.num_warmup):
             self._run_encoder(bucket)
-        torch.cuda.synchronize()
+        torch.get_device_module().synchronize()
         stream = decode_wrapper.stream if decode_wrapper is not None else None
         cap = BreakableCapture(
             pool=self._pool,
@@ -892,7 +893,7 @@ class PrefillGraph:
                 CapturedForward(*self._narrowing.decoder_forward(statics, self._ctx))
             )
         self._reserve_outputs(spec)
-        torch.cuda.synchronize()
+        torch.get_device_module().synchronize()
         rearm()
         stream = decode_wrapper.stream if decode_wrapper is not None else None
         cap = BreakableCapture(

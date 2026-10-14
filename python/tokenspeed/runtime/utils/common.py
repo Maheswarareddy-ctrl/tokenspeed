@@ -145,6 +145,19 @@ def maybe_set_numa_aware_cpu_affinity(device_id: int) -> None:
     )
 
 
+def device_mem_get_info(device_module: Any, gpu_id: int) -> tuple[int, int]:
+    """Return the device's (free, total) bytes, as ``mem_get_info`` would.
+
+    Some XPU drivers report free == total no matter what is allocated, which
+    hides every allocation from memory planning. On XPU, also cap free memory
+    by what PyTorch's allocator holds.
+    """
+    free, total = device_module.mem_get_info(gpu_id)
+    if device_module is torch.xpu:
+        free = min(free, total - device_module.memory_reserved(gpu_id))
+    return free, total
+
+
 def get_available_gpu_memory(
     device, gpu_id, distributed=False, empty_cache=True, cpu_group=None
 ):
@@ -167,7 +180,7 @@ def get_available_gpu_memory(
 
         if empty_cache:
             device_module.empty_cache()
-        free_gpu_memory, _ = device_module.mem_get_info(gpu_id)
+        free_gpu_memory, _ = device_mem_get_info(device_module, gpu_id)
 
     if distributed:
         tensor = torch.tensor(free_gpu_memory, dtype=torch.float32)

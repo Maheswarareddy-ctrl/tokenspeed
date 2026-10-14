@@ -28,6 +28,8 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from tokenspeed.runtime.utils.common import device_mem_get_info
+
 
 class DeviceMemoryModule(Protocol):
     """The slice of a torch device module the observer reads free memory through."""
@@ -61,7 +63,7 @@ class DriverMemoryDeltaObserver:
         # Both first, so the endpoints sit on the same ground as the capture's own.
         gc.collect()
         self.device_module.empty_cache()
-        free_before = int(self.device_module.mem_get_info(self.gpu_id)[0])
+        free_before = int(device_mem_get_info(self.device_module, self.gpu_id)[0])
 
         yield
 
@@ -69,7 +71,7 @@ class DriverMemoryDeltaObserver:
         # Symmetric with the entry: what the region kept, not what it touched.
         gc.collect()
         self.device_module.empty_cache()
-        free_after = int(self.device_module.mem_get_info(self.gpu_id)[0])
+        free_after = int(device_mem_get_info(self.device_module, self.gpu_id)[0])
         self.samples.setdefault(series, []).append(free_before - free_after)
 
 

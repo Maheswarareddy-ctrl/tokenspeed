@@ -48,7 +48,8 @@ _CPP_SOURCE = r"""
 #include <vector>
 
 at::Tensor weak_ref_tensor(const at::Tensor& tensor) {
-  TORCH_CHECK(tensor.is_cuda(), "weak_ref_tensor expects a CUDA tensor");
+  TORCH_CHECK(tensor.is_cuda() || tensor.is_xpu(),
+            "weak_ref_tensor expects a CUDA or XPU tensor");
   void* data_ptr = tensor.data_ptr();
   std::vector<int64_t> sizes = tensor.sizes().vec();
   std::vector<int64_t> strides = tensor.strides().vec();
@@ -87,10 +88,10 @@ def _load():
 
 
 def weak_ref_tensor(t: torch.Tensor) -> torch.Tensor:
-    """Return a non-owning view of CUDA tensor ``t`` (alias, same shape/strides).
+    """Return a non-owning view of GPU tensor ``t`` (alias, same shape/strides).
 
     Args:
-        t: A CUDA tensor. The caller must guarantee the aliased memory is
+        t: A CUDA or XPU tensor. The caller must guarantee the aliased memory is
             rewritten (or still valid) whenever the view is consumed -- for
             breakable-graph closures this holds because the captured segment
             producing ``t`` replays before the break reads the view.

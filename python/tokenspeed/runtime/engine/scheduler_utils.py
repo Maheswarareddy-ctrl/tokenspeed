@@ -51,6 +51,7 @@ from tokenspeed.runtime.layers.attention.kv_cache.recipes.scheduler_bridge impor
     cache_group_config,
     scheduler_role,
 )
+from tokenspeed.runtime.utils.common import device_mem_get_info
 
 _CACHE_EVENT_TYPES = {
     "WriteBackDoneEvent": Cache.WriteBackDoneEvent,
@@ -958,7 +959,7 @@ def log_gpu_memory_summary(
             draft_total = sum(draft_sink.values())
         draft_gb = draft_total / GB
 
-        free_bytes, total_bytes = device_module.mem_get_info(gpu_id)
+        free_bytes, total_bytes = device_mem_get_info(device_module, gpu_id)
         allocated = device_module.memory_allocated(gpu_id) / GB
         reserved = device_module.memory_reserved(gpu_id) / GB
         device_total = total_bytes / GB

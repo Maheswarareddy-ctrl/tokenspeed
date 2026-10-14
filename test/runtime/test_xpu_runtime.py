@@ -37,6 +37,10 @@ pytestmark = pytest.mark.skipif(
 import tokenspeed_kernel._triton as kernel_triton  # noqa: E402
 
 from tokenspeed.runtime.configs.device_config import DeviceConfig  # noqa: E402
+from tokenspeed.runtime.execution.breakable_cuda_graph import (  # noqa: E402
+    BreakableCapture,
+    break_here,
+)
 from tokenspeed.runtime.execution.device import _NoDeviceWork  # noqa: E402
 from tokenspeed.runtime.execution.forward_step import ForwardStepRunner  # noqa: E402
 from tokenspeed.runtime.sampling.backends.base import (  # noqa: E402
@@ -46,7 +50,10 @@ from tokenspeed.runtime.sampling.backends.triton import (  # noqa: E402
     TritonSamplingBackend,
 )
 from tokenspeed.runtime.utils import triton as runtime_triton  # noqa: E402
-from tokenspeed.runtime.utils.common import get_available_gpu_memory  # noqa: E402
+from tokenspeed.runtime.utils.common import (  # noqa: E402
+    device_mem_get_info,
+    get_available_gpu_memory,
+)
 from tokenspeed.runtime.utils.server_args import ServerArgs  # noqa: E402
 
 
@@ -109,3 +116,27 @@ def test_decode_graph_capture_records_an_xpu_graph() -> None:
     with mock.patch.object(torch.xpu, "XPUGraph", _xpu_graph):
         with pytest.raises(_Recorded):
             runner._capture_one(1, observer=contextlib.nullcontext())
+
+
+def test_free_memory_counts_torch_allocations_on_xpu() -> None:
+    torch.xpu.empty_cache()
+    before, _ = device_mem_get_info(torch.xpu, 0)
+    held = torch.empty(1 << 30, dtype=torch.uint8, device="xpu")
+    after, _ = device_mem_get_info(torch.xpu, 0)
+    assert before - after >= held.numel()
+
+
+def test_breakable_capture_replays_on_xpu() -> None:
+    x = torch.ones(4, device="xpu")
+    out = torch.empty(4, device="xpu")
+    cap = BreakableCapture()
+    with cap:
+        y = x * 2
+        z = break_here(lambda t: t + 1, out, y)
+        w = z * 10
+    assert cap.num_segments == 3  # graph, eager break, graph
+
+    x.fill_(3)
+    cap.replay()
+    torch.xpu.synchronize()
+    assert w.tolist() == [70.0] * 4
