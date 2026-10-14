@@ -2082,7 +2082,7 @@ class ServerArgs:
             "--device",
             type=str,
             default="cuda",
-            choices=["cuda", "npu"],
+            choices=["cuda", "npu", "xpu"],
             help="The device type.",
         )
         parser.add_argument(

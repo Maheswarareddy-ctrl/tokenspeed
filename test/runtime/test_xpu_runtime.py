@@ -22,6 +22,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import argparse
+
 import pytest
 import torch
 
@@ -36,10 +38,17 @@ from tokenspeed.runtime.configs.device_config import DeviceConfig  # noqa: E402
 from tokenspeed.runtime.execution.device import _NoDeviceWork  # noqa: E402
 from tokenspeed.runtime.utils import triton as runtime_triton  # noqa: E402
 from tokenspeed.runtime.utils.common import get_available_gpu_memory  # noqa: E402
+from tokenspeed.runtime.utils.server_args import ServerArgs  # noqa: E402
 
 
 def test_device_config_accepts_xpu() -> None:
     assert DeviceConfig("xpu").device == torch.device("xpu")
+
+
+def test_cli_accepts_xpu_device() -> None:
+    parser = argparse.ArgumentParser()
+    ServerArgs.add_cli_args(parser)
+    assert parser.parse_args(["--model", "x", "--device", "xpu"]).device == "xpu"
 
 
 def test_available_gpu_memory_on_xpu() -> None:
