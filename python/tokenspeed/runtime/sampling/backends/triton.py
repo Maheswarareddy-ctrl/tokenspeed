@@ -42,6 +42,7 @@ from tokenspeed_kernel.ops.sampling.triton import (
     verify_chain_target_sampled,
     verify_tree,
 )
+from tokenspeed_kernel.platform import current_platform
 
 from tokenspeed.runtime.sampling.backends.base import (
     CUDA_GRAPH_VARIANT_DEFAULT,
@@ -178,7 +179,8 @@ class TritonSamplingBackend(SamplingBackend):
             device=config.device,
         )
         max_verify_rows = max(config.max_bs * config.max_draft_tokens_per_req, 1)
-        num_sms = torch.cuda.get_device_properties(config.device).multi_processor_count
+        num_sms = current_platform().sm_count
+
         self._qrita_verify_num_programs = min(num_sms, max_verify_rows)
         self._qrita_verify_buffer = torch.empty(
             (self._qrita_verify_num_programs, vocab_size),

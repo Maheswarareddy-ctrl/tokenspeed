@@ -378,8 +378,8 @@ def gumbel_sample_top_p_parallel_from_pools(
     """Block-parallel top-p-only Gumbel sampler."""
     if logits.ndim != 2:
         raise ValueError("gumbel_sample_top_p_parallel_from_pools expects 2D logits")
-    if logits.device.type != "cuda":
-        raise ValueError("gumbel_sample_top_p_parallel_from_pools requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError("gumbel_sample_top_p_parallel_from_pools requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             "gumbel_sample_top_p_parallel_from_pools requires stride-1 vocab dimension, "
@@ -418,8 +418,8 @@ def gumbel_sample_top_p_parallel_from_pools(
         ("accepted", accepted, torch.int32),
         ("out", out, torch.int32),
     ):
-        if tensor.device.type != "cuda":
-            raise ValueError(f"{name} must be CUDA")
+        if tensor.device.type not in ("cuda", "xpu"):
+            raise ValueError(f"{name} must be on GPU")
         if tensor.dtype != dtype:
             raise ValueError(f"{name} must be {dtype}, got {tensor.dtype}")
     for name, tensor in (
@@ -434,8 +434,8 @@ def gumbel_sample_top_p_parallel_from_pools(
         ("row_total", row_total),
         ("row_candidate_logits", row_candidate_logits),
     ):
-        if tensor.device.type != "cuda":
-            raise ValueError(f"{name} must be CUDA")
+        if tensor.device.type not in ("cuda", "xpu"):
+            raise ValueError(f"{name} must be on GPU")
     if out.shape[0] < rows:
         raise ValueError(f"out is too small: {out.shape[0]} < {rows}")
     if rows == 0:

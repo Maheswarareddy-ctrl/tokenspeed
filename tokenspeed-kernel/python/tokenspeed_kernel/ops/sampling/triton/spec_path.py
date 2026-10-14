@@ -111,10 +111,10 @@ def dflash2_greedy_path(
     if out.stride(1) != 1:
         raise ValueError("out rows must be contiguous")
     if not all(
-        tensor.device.type == "cuda"
+        tensor.device.type in ("cuda", "xpu")
         for tensor in (candidate_ids, scores, anchor_token_ids, out)
     ):
-        raise ValueError("dflash2_greedy_path requires CUDA tensors")
+        raise ValueError("dflash2_greedy_path requires GPU tensors")
     if batch_size == 0 or num_steps == 0:
         return out
 

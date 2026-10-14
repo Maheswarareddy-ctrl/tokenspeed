@@ -418,8 +418,8 @@ def _check_top_k_top_p_gumbel_inputs(
         raise ValueError(
             f"gumbel_sample_top_k_top_p_from_pools expects 2D logits, got {logits.ndim}D"
         )
-    if logits.device.type != "cuda":
-        raise ValueError("gumbel_sample_top_k_top_p_from_pools requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError("gumbel_sample_top_k_top_p_from_pools requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             "gumbel_sample_top_k_top_p_from_pools requires stride-1 vocab dimension, "
@@ -442,8 +442,8 @@ def _check_top_k_top_p_gumbel_inputs(
         ("candidate_logits", candidate_logits, 2),
         ("out", out, 1),
     ):
-        if tensor.device.type != "cuda":
-            raise ValueError(f"{name} must be CUDA")
+        if tensor.device.type not in ("cuda", "xpu"):
+            raise ValueError(f"{name} must be on GPU")
         if tensor.ndim != ndim:
             raise ValueError(f"{name} must be {ndim}D, got {tensor.ndim}D")
     if num_tokens_per_req <= 0:
@@ -466,8 +466,8 @@ def _check_top_k_top_p_gumbel_inputs(
     if top_k_pool.dtype != torch.int32:
         raise ValueError(f"top_k_pool must be int32, got {top_k_pool.dtype}")
     if min_p_pool is not None:
-        if min_p_pool.device.type != "cuda":
-            raise ValueError("min_p_pool must be CUDA")
+        if min_p_pool.device.type not in ("cuda", "xpu"):
+            raise ValueError("min_p_pool must be on GPU")
         if min_p_pool.ndim != 1:
             raise ValueError(f"min_p_pool must be 1D, got {min_p_pool.ndim}D")
     if seed_pool.dtype != torch.int64:
@@ -1085,9 +1085,9 @@ def _check_top_k_top_p_qrita_inputs(
         raise ValueError(
             f"gumbel_sample_top_k_top_p_qrita_from_pools expects 2D logits, got {logits.ndim}D"
         )
-    if logits.device.type != "cuda":
+    if logits.device.type not in ("cuda", "xpu"):
         raise ValueError(
-            "gumbel_sample_top_k_top_p_qrita_from_pools requires CUDA logits"
+            "gumbel_sample_top_k_top_p_qrita_from_pools requires GPU logits"
         )
     if logits.stride(-1) != 1:
         raise ValueError(
@@ -1111,8 +1111,8 @@ def _check_top_k_top_p_qrita_inputs(
         ("percentile_to_std_table", percentile_to_std_table, 1),
         ("out", out, 1),
     ):
-        if tensor.device.type != "cuda":
-            raise ValueError(f"{name} must be CUDA")
+        if tensor.device.type not in ("cuda", "xpu"):
+            raise ValueError(f"{name} must be on GPU")
         if tensor.ndim != ndim:
             raise ValueError(f"{name} must be {ndim}D, got {tensor.ndim}D")
     if num_tokens_per_req <= 0:

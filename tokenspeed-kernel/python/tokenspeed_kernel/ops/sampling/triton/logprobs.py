@@ -73,8 +73,8 @@ def selected_token_logprobs(
     """Compute ``log_softmax(logits)[row, tokens[row]]`` without materializing it."""
     if logits.ndim != 2:
         raise ValueError(f"selected_token_logprobs expects 2D logits")
-    if logits.device.type != "cuda":
-        raise ValueError("selected_token_logprobs requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError("selected_token_logprobs requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             "selected_token_logprobs requires stride-1 vocab dimension, "

@@ -97,8 +97,11 @@ def min_p_renorm_prob(
             "min_p length must match probs rows, "
             f"got {min_p.shape[0]} and {probs.shape[0]}"
         )
-    if probs.device.type != "cuda" or min_p.device.type != "cuda":
-        raise ValueError("min_p_renorm_prob requires CUDA tensors")
+    if probs.device.type not in ("cuda", "xpu") or min_p.device.type not in (
+        "cuda",
+        "xpu",
+    ):
+        raise ValueError("min_p_renorm_prob requires GPU tensors")
     if probs.stride(-1) != 1:
         raise ValueError(
             f"min_p_renorm_prob requires stride-1 vocab dimension, got stride={probs.stride()}"

@@ -159,7 +159,15 @@ def _gumbel_sample_generic_pool_kernel(
     top_weights = tl.where(rank_offsets < top_k, top_weights, 0.0)
     top_denom = tl.maximum(tl.sum(top_weights, axis=0), 1.0e-20)
     top_probs = top_weights / top_denom
-    top_cumulative_before = tl.cumsum(top_probs) - top_probs
+    # Exclusive prefix sum as a masked row sum: tl.cumsum here crashes the
+    # Intel XPU Triton compiler (RemoveLayoutConversions pass).
+    top_cumulative_before = tl.sum(
+        tl.where(
+            rank_offsets[None, :] < rank_offsets[:, None], top_probs[None, :], 0.0
+        ),
+        axis=1,
+    )
+
     top_keep = (
         (rank_offsets < top_k)
         & (top_cumulative_before < top_p)
@@ -255,8 +263,8 @@ def gumbel_sample_from_pools_generic(
     """Graph-safe Gumbel sampler for mixed top-k/top-p rows."""
     if logits.ndim != 2:
         raise ValueError(f"gumbel_sample_from_pools_generic expects 2D logits")
-    if logits.device.type != "cuda":
-        raise ValueError("gumbel_sample_from_pools_generic requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError("gumbel_sample_from_pools_generic requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             "gumbel_sample_from_pools_generic requires stride-1 vocab dimension, "
@@ -291,8 +299,8 @@ def gumbel_sample_from_pools_generic(
     if out.shape[0] < rows:
         raise ValueError(f"out is too small: {out.shape[0]} < {rows}")
     if min_p_pool is not None:
-        if min_p_pool.device.type != "cuda":
-            raise ValueError("min_p_pool must be CUDA")
+        if min_p_pool.device.type not in ("cuda", "xpu"):
+            raise ValueError("min_p_pool must be on GPU")
         if min_p_pool.ndim != 1:
             raise ValueError(f"min_p_pool must be 1D, got {min_p_pool.ndim}D")
     if rows == 0:

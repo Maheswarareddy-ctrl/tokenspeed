@@ -201,8 +201,8 @@ def _check_gumbel_pool_inputs(
 ) -> tuple[int, int, int]:
     if logits.ndim != 2:
         raise ValueError(f"{fn_name} expects 2D logits, got {logits.ndim}D")
-    if logits.device.type != "cuda":
-        raise ValueError(f"{fn_name} requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError(f"{fn_name} requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             f"{fn_name} requires stride-1 vocab dimension, "
@@ -219,8 +219,8 @@ def _check_gumbel_pool_inputs(
         ("offsets_pool", offsets_pool, 1),
         ("out", out, 1),
     ):
-        if tensor.device.type != "cuda":
-            raise ValueError(f"{name} must be CUDA")
+        if tensor.device.type not in ("cuda", "xpu"):
+            raise ValueError(f"{name} must be on GPU")
         if tensor.ndim != ndim:
             raise ValueError(f"{name} must be {ndim}D, got {tensor.ndim}D")
     if num_tokens_per_req <= 0:
@@ -246,8 +246,11 @@ def _check_gumbel_pool_inputs(
         raise ValueError(f"seed_pool must be int64, got {seed_pool.dtype}")
 
     num_blocks = triton.cdiv(vocab_size, block_size)
-    if local_ids.device.type != "cuda" or local_scores.device.type != "cuda":
-        raise ValueError("gumbel pool scratch tensors must be CUDA")
+    if local_ids.device.type not in ("cuda", "xpu") or local_scores.device.type not in (
+        "cuda",
+        "xpu",
+    ):
+        raise ValueError("gumbel pool scratch tensors must be on GPU")
     if local_ids.ndim != 2 or local_scores.ndim != 2:
         raise ValueError("gumbel pool scratch tensors must be 2D")
     if local_ids.shape[0] < rows or local_scores.shape[0] < rows:
@@ -338,8 +341,8 @@ def gumbel_sample_from_pools_compact(
         raise ValueError(
             f"gumbel_sample_from_pools_compact expects 2D logits, got {logits.ndim}D"
         )
-    if logits.device.type != "cuda":
-        raise ValueError("gumbel_sample_from_pools_compact requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError("gumbel_sample_from_pools_compact requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             "gumbel_sample_from_pools_compact requires stride-1 vocab dimension, "

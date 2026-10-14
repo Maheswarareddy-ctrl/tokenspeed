@@ -36,6 +36,12 @@ import tokenspeed_kernel._triton as kernel_triton  # noqa: E402
 
 from tokenspeed.runtime.configs.device_config import DeviceConfig  # noqa: E402
 from tokenspeed.runtime.execution.device import _NoDeviceWork  # noqa: E402
+from tokenspeed.runtime.sampling.backends.base import (  # noqa: E402
+    SamplingBackendConfig,
+)
+from tokenspeed.runtime.sampling.backends.triton import (  # noqa: E402
+    TritonSamplingBackend,
+)
 from tokenspeed.runtime.utils import triton as runtime_triton  # noqa: E402
 from tokenspeed.runtime.utils.common import get_available_gpu_memory  # noqa: E402
 from tokenspeed.runtime.utils.server_args import ServerArgs  # noqa: E402
@@ -70,3 +76,17 @@ def test_the_guard_rejects_xpu_work_on_the_control_plane() -> None:
 def test_runtime_triton_is_the_kernel_platform_triton() -> None:
     assert runtime_triton.triton is kernel_triton.triton
     assert runtime_triton.tl is kernel_triton.tl
+
+
+def test_triton_sampling_backend_builds_on_xpu() -> None:
+    config = SamplingBackendConfig(
+        enable_speculative_sampling=False,
+        sampling_stream="batch",
+        logprob_order="torch",
+        max_bs=4,
+        max_draft_tokens_per_req=4,
+        max_req_pool_size=8,
+        vocab_size=1024,
+        device="xpu",
+    )
+    TritonSamplingBackend(config)  # used to crash on torch.cuda

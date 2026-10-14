@@ -120,8 +120,8 @@ def gumbel_sample_min_p_from_pools(
     """Gumbel-Max sampler for no top-k/top-p rows with a min-p cutoff."""
     if logits.ndim != 2:
         raise ValueError(f"gumbel_sample_min_p_from_pools expects 2D logits")
-    if logits.device.type != "cuda":
-        raise ValueError("gumbel_sample_min_p_from_pools requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError("gumbel_sample_min_p_from_pools requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             "gumbel_sample_min_p_from_pools requires stride-1 vocab dimension, "
@@ -303,12 +303,12 @@ def gumbel_sample_min_p_from_pools_parallel(
         block_size=_MIN_P_PARALLEL_BLOCK_SIZE,
         num_tokens_per_req=num_tokens_per_req,
     )
-    if min_p_pool.device.type != "cuda":
-        raise ValueError("min_p_pool must be CUDA")
+    if min_p_pool.device.type not in ("cuda", "xpu"):
+        raise ValueError("min_p_pool must be on GPU")
     if min_p_pool.ndim != 1:
         raise ValueError(f"min_p_pool must be 1D, got {min_p_pool.ndim}D")
-    if row_max.device.type != "cuda":
-        raise ValueError("row_max must be CUDA")
+    if row_max.device.type not in ("cuda", "xpu"):
+        raise ValueError("row_max must be on GPU")
     if row_max.dtype != torch.float32:
         raise ValueError(f"row_max must be float32, got {row_max.dtype}")
     if row_max.shape[0] < rows:

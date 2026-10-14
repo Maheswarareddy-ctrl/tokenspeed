@@ -89,8 +89,8 @@ def apply_penalties_logit_bias_inplace(
         raise ValueError(f"logits must be 2D, got {logits.ndim}D")
     if counts.ndim != 2 or logit_bias.ndim != 2:
         raise ValueError("counts and logit_bias must be 2D")
-    if logits.device.type != "cuda":
-        raise ValueError("apply_penalties_logit_bias_inplace requires CUDA logits")
+    if logits.device.type not in ("cuda", "xpu"):
+        raise ValueError("apply_penalties_logit_bias_inplace requires GPU logits")
     if logits.stride(-1) != 1:
         raise ValueError(
             "apply_penalties_logit_bias_inplace requires stride-1 vocab dimension, "
@@ -181,8 +181,8 @@ def accumulate_counts_inplace(
     """Graph-safe ``counts[pool_idx, tokens] += weights``."""
     if counts.ndim != 2:
         raise ValueError(f"counts must be 2D, got {counts.ndim}D")
-    if counts.device.type != "cuda":
-        raise ValueError("accumulate_counts_inplace requires CUDA counts")
+    if counts.device.type not in ("cuda", "xpu"):
+        raise ValueError("accumulate_counts_inplace requires GPU counts")
     if counts.dtype != torch.int32:
         raise ValueError(f"counts must be int32, got {counts.dtype}")
     if pool_idx.dtype != torch.int32:
