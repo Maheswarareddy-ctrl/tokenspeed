@@ -49,7 +49,7 @@ _CPP_SOURCE = r"""
 
 at::Tensor weak_ref_tensor(const at::Tensor& tensor) {
   TORCH_CHECK(tensor.is_cuda() || tensor.is_xpu(),
-            "weak_ref_tensor expects a CUDA or XPU tensor");
+              "weak_ref_tensor expects a CUDA or XPU tensor");
   void* data_ptr = tensor.data_ptr();
   std::vector<int64_t> sizes = tensor.sizes().vec();
   std::vector<int64_t> strides = tensor.strides().vec();
