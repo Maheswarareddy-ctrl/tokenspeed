@@ -33,6 +33,7 @@ pytestmark = pytest.mark.skipif(
 import tokenspeed_kernel._triton as kernel_triton  # noqa: E402
 
 from tokenspeed.runtime.configs.device_config import DeviceConfig  # noqa: E402
+from tokenspeed.runtime.execution.device import _NoDeviceWork  # noqa: E402
 from tokenspeed.runtime.utils import triton as runtime_triton  # noqa: E402
 from tokenspeed.runtime.utils.common import get_available_gpu_memory  # noqa: E402
 
@@ -45,6 +46,16 @@ def test_available_gpu_memory_on_xpu() -> None:
     total_gb = torch.xpu.get_device_properties(0).total_memory / (1 << 30)
 
     assert 0 < get_available_gpu_memory("xpu", 0) <= total_gb
+
+
+def test_the_guard_rejects_xpu_work_on_the_control_plane() -> None:
+    xpu = torch.zeros(2, device="xpu")
+    with _NoDeviceWork():
+        with pytest.raises(RuntimeError, match="XPU factory"):
+            torch.empty(2, device="xpu")
+        with pytest.raises(RuntimeError, match="XPU tensor"):
+            xpu.add_(1)
+        assert xpu.view(1, 2).shape == (1, 2)  # views do no device work
 
 
 def test_runtime_triton_is_the_kernel_platform_triton() -> None:

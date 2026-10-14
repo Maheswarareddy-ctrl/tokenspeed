@@ -1618,6 +1618,10 @@ def _only_aliases_inputs(func) -> bool:
     return all(r.alias_info is not None and not r.alias_info.is_write for r in returns)
 
 
+# Device types whose tensor work must stay off the control plane.
+_GUARDED_DEVICE_TYPES = ("cuda", "xpu")
+
+
 class _NoDeviceWork(TorchDispatchMode):
     """Raise on any torch op that puts device work on this thread.
 
@@ -1651,21 +1655,23 @@ class _NoDeviceWork(TorchDispatchMode):
         while stack:
             value = stack.pop()
             if isinstance(value, torch.Tensor):
-                if value.device.type == "cuda":
+                if value.device.type in _GUARDED_DEVICE_TYPES:
                     allowed = self._alias_only.get(func)
                     if allowed is None:
                         allowed = self._alias_only[func] = _only_aliases_inputs(func)
                     if allowed:
                         break
                     raise RuntimeError(
-                        f"control-plane thread ran {func} on a CUDA tensor; "
+                        f"control-plane thread ran {func} on a "
+                        f"{value.device.type.upper()} tensor; "
                         "device work crosses only through DeviceHandle — see "
                         "docs/design/event-loop.md Principle 1"
                     )
             elif isinstance(value, torch.device):
-                if value.type == "cuda":
+                if value.type in _GUARDED_DEVICE_TYPES:
                     raise RuntimeError(
-                        f"control-plane thread ran CUDA factory {func}; "
+                        f"control-plane thread ran {value.type.upper()} "
+                        f"factory {func}; "
                         "device work crosses only through DeviceHandle — see "
                         "docs/design/event-loop.md Principle 1"
                     )
