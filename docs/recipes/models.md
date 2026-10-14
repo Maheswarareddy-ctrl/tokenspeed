@@ -574,6 +574,64 @@ tokenspeed serve Qwen/Qwen3-30B-A3B \
   --port 8000
 ```
 
+### Qwen3-0.6B on Intel XPU
+
+The Intel XPU path serves unquantized Qwen3-0.6B on one Intel GPU. Norms,
+activations and paged MHA attention run on SYCL kernels from
+[sgl-kernel-xpu](https://github.com/sgl-project/sgl-kernel-xpu), wrapped by
+`tokenspeed-kernel-xpu`. The attention prologue and sampling run on the
+TokenSpeed Triton kernels through Intel Triton (`triton-xpu`). Decode batches
+are captured as XPU graphs, and prefill runs as breakable graphs with eager
+attention breaks.
+
+The validated environment is an Intel Arc B580 (Xe2), Python 3.12, PyTorch
+2.13.0+xpu, `triton-xpu` 3.7.2 (pinned by that PyTorch build), and
+`sglang-kernel-xpu` 0.3.0 built from source for `bmg`. From the repository
+root:
+
+```bash
+pip install torch==2.13.0 torchvision --index-url https://download.pytorch.org/whl/xpu
+git clone https://github.com/sgl-project/sgl-kernel-xpu
+(cd sgl-kernel-xpu && BUILD_TARGET_DEVICE=bmg pip install -v .)
+pip install --no-deps --no-build-isolation -e tokenspeed-kernel-xpu
+export PYTHONPATH="${PWD}/python:${PWD}/tokenspeed-kernel/python:${PYTHONPATH:-}"
+```
+
+Install the remaining TokenSpeed dependencies with `torch` constrained to the
+XPU build. Install `xgrammar` with `--no-deps`, because its dependencies pull a
+CUDA Triton that replaces `triton-xpu`.
+
+```bash
+python -m tokenspeed.cli serve Qwen/Qwen3-0.6B \
+  --device xpu \
+  --attention-backend mha \
+  --sampling-backend triton \
+  --disable-kvstore \
+  --max-model-len 2048 \
+  --gpu-memory-utilization 0.6 \
+  --port 8000
+```
+
+Pass `--sampling-backend triton` explicitly: on GPUs other than NVIDIA the
+default is `greedy`, which ignores `temperature`, `top_p` and `top_k`. The
+sgl-kernel-xpu attention kernels support page sizes 64 and 128, so keep
+`--prefix-granularity` at its default of 64 or set it to 128. The XPU driver
+does not report free device memory, so TokenSpeed estimates it from the PyTorch
+allocator. `--gpu-memory-utilization 0.6` leaves headroom for memory allocated
+outside PyTorch.
+
+```bash
+curl http://127.0.0.1:8000/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "Qwen/Qwen3-0.6B",
+    "messages": [{"role": "user", "content": "What is the capital of France?"}],
+    "max_tokens": 64,
+    "chat_template_kwargs": {"enable_thinking": false}
+  }'
+```
+
+
 ## Qwen3.8
 
 Qwen3.8 shares the hybrid linear-attention (GDN) / full-attention layer
