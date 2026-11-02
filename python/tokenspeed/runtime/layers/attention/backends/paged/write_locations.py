@@ -176,7 +176,7 @@ def decode_write_locations(
             f"decode write-location buffer holds {out.shape[1]} slots per group, "
             f"need {num_tokens} (bs={bs}, tokens_per_req={n})"
         )
-    if tables.is_cuda:
+    if tables.is_cuda or tables.is_xpu:
         block = 128
         grid = (tables.shape[0], triton.cdiv(num_tokens, block))
         _decode_locs_kernel[grid](
@@ -229,7 +229,7 @@ def extend_write_locations(
         return out
     cu_extend = torch.zeros(bs + 1, dtype=torch.int32, device=tables.device)
     torch.cumsum(extend_seq_lens, dim=0, out=cu_extend[1:])
-    if tables.is_cuda:
+    if tables.is_cuda or tables.is_xpu:
         _extend_locs_kernel[(tables.shape[0], bs)](
             tables,
             page_sizes,

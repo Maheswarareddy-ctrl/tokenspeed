@@ -36,6 +36,7 @@ pytestmark = pytest.mark.skipif(
 
 import tokenspeed_kernel._triton as kernel_triton  # noqa: E402
 
+import tokenspeed.runtime.layers.attention.backends.paged.write_locations as write_locations  # noqa: E402
 from tokenspeed.runtime.configs.device_config import DeviceConfig  # noqa: E402
 from tokenspeed.runtime.execution.breakable_cuda_graph import (  # noqa: E402
     BreakableCapture,
@@ -140,3 +141,45 @@ def test_breakable_capture_replays_on_xpu() -> None:
     cap.replay()
     torch.xpu.synchronize()
     assert w.tolist() == [70.0] * 4
+
+
+def test_write_locations_take_the_triton_kernels_on_xpu() -> None:
+    """XPU fills decode and extend write slots with the Triton kernels, not the
+    torch reference path (whose per-group page-size read syncs every step), and
+    the slots match the reference."""
+    torch.manual_seed(0)
+    groups, max_bs, max_pages, page_size, bs = 1, 8, 32, 64, 5
+    tables = torch.randint(1, 1000, (groups, max_bs, max_pages), dtype=torch.int32)
+    page_sizes = torch.full((groups,), page_size, dtype=torch.int32)
+    seq_lens = torch.randint(1, max_pages * page_size, (bs,), dtype=torch.int32)
+    prefix_lens = torch.randint(0, 500, (bs,), dtype=torch.int32)
+    extend_lens = torch.randint(1, 300, (bs,), dtype=torch.int32)
+    total = int(extend_lens.sum())
+
+    def decode(device: str) -> torch.Tensor:
+        out = torch.zeros(groups, 64, dtype=torch.int32, device=device)
+        write_locations.decode_write_locations(
+            tables.to(device), page_sizes.to(device), seq_lens.to(device), out, bs, 1
+        )
+        return out.cpu()
+
+    def extend(device: str) -> torch.Tensor:
+        out = torch.zeros(groups, total, dtype=torch.int32, device=device)
+        return write_locations.extend_write_locations(
+            tables.to(device),
+            page_sizes.to(device),
+            prefix_lens.to(device),
+            extend_lens.to(device),
+            total,
+            out,
+        ).cpu()
+
+    reference_decode = decode("cpu")
+    with mock.patch.object(
+        write_locations,
+        "_gather_slots",
+        side_effect=AssertionError("torch path on XPU"),
+    ):
+        xpu_decode = decode("xpu")
+    assert torch.equal(xpu_decode, reference_decode)
+    assert torch.equal(extend("xpu"), extend("cpu"))
