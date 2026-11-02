@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import torch
 import zmq
+from tokenspeed_kernel.platform import current_platform
 from tokenspeed_kernel.profiling import (
     ProfilingState,
     profile_config_from_env,
@@ -1021,8 +1022,13 @@ class RequestHandler:
 
         activity_map = {
             "CPU": torch.profiler.ProfilerActivity.CPU,
-            "GPU": torch.profiler.ProfilerActivity.CUDA,
+            "GPU": (
+                torch.profiler.ProfilerActivity.XPU
+                if current_platform().is_xpu
+                else torch.profiler.ProfilerActivity.CUDA
+            ),
         }
+
         torchprof_activities = [
             activity_map[a] for a in activities if a in activity_map
         ]
