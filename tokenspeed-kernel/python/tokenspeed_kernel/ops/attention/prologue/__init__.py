@@ -389,4 +389,5 @@ __all__ = [
 
 # Backend registration (side-effect imports)
 import tokenspeed_kernel.ops.attention.prologue.composite  # noqa: E402,F401
+import tokenspeed_kernel.ops.attention.prologue.sycl  # noqa: E402,F401
 import tokenspeed_kernel.ops.attention.prologue.triton  # noqa: E402,F401
