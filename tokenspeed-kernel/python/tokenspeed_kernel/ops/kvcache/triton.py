@@ -2265,7 +2265,7 @@ def _recommended_program_count(
     else:
         programs_per_sm = 2
 
-    sm_count = torch.cuda.get_device_properties(device).multi_processor_count
+    sm_count = current_platform().sm_count
     return max(1, min(length, sm_count * programs_per_sm))
 
 

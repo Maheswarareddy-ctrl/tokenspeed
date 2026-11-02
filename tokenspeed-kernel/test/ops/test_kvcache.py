@@ -873,7 +873,7 @@ def test_transfer_kv_all_layer(device: str) -> None:
         num_layers=num_layers,
     )
 
-    torch.cuda.synchronize()
+    torch.accelerator.synchronize()
 
     for layer_idx in range(num_layers):
         assert torch.equal(k_layers_dst[layer_idx], expected_k[layer_idx])
@@ -954,7 +954,7 @@ def test_transfer_kv_all_layer_mla(device: str) -> None:
         num_layers=num_layers,
     )
 
-    torch.cuda.synchronize()
+    torch.accelerator.synchronize()
 
     for layer_idx in range(num_layers):
         assert torch.equal(layers_dst[layer_idx], expected[layer_idx])
