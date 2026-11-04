@@ -114,6 +114,61 @@ def test_sycl_gqa_prologue_matches_step_by_step_reference(return_kv: bool) -> No
     assert torch.equal(v_cache[slots].flatten(1), ref_v)
 
 
+def _rope(
+    x: torch.Tensor, cos_sin: torch.Tensor, positions: torch.Tensor, head_dim: int
+) -> torch.Tensor:
+    """Step-by-step reference without a norm: fp32 NEOX RoPE rounded to bf16."""
+    heads = x.unflatten(-1, (-1, head_dim)).float()
+    cos, sin = cos_sin[positions].chunk(2, dim=-1)
+    cos, sin = cos[:, None, :], sin[:, None, :]
+    x1, x2 = heads.chunk(2, dim=-1)
+    rotated = torch.cat((x1 * cos - x2 * sin, x2 * cos + x1 * sin), dim=-1)
+    return rotated.to(BF16).flatten(1)
+
+
+def test_sycl_gqa_prologue_head_dim_64_without_norm() -> None:
+    # Llama-3.2-1B-like layer: 32 query heads share 8 KV heads of width 64 and
+    # there is no QK norm; this width takes sgl-kernel-xpu's rotary_embedding.
+    q_heads, kv_heads, head_dim = 32, 8, 64
+    torch.manual_seed(0)
+    qkv = torch.randn(
+        _TOKENS, (q_heads + 2 * kv_heads) * head_dim, device="xpu", dtype=BF16
+    )
+    q, k, v = qkv.split(
+        [q_heads * head_dim, kv_heads * head_dim, kv_heads * head_dim], dim=-1
+    )
+    cos_sin = _cos_sin_cache(head_dim)
+    positions = torch.randint(0, 4096, (_TOKENS,), device="xpu")
+    rotary = Rotary(
+        cos_sin_cache=cos_sin, positions=positions, style=RopeStyle.NEOX, mrope=None
+    )
+    slots = torch.randperm(_CACHE_SLOTS, device="xpu")[:_TOKENS]
+    k_cache = torch.zeros(_CACHE_SLOTS, kv_heads, head_dim, device="xpu", dtype=BF16)
+    v_cache = torch.zeros_like(k_cache)
+    # rotary_embedding reads the table in bf16, as SGLang passes it.
+    table = cos_sin.to(BF16).float()
+    ref_q = _rope(q, table, positions, head_dim)
+    ref_k = _rope(k, table, positions, head_dim)
+
+    ref_v = v.clone()
+
+    out = gqa_prologue(
+        q,
+        k,
+        v,
+        norm=None,
+        rotary=rotary,
+        cache=HeadKVCache(k_cache=k_cache, v_cache=v_cache, scales=None, slots=slots),
+        return_kv=True,
+        solution=None,
+        override="sycl_gqa_prologue",
+    )
+
+    torch.testing.assert_close(out.q, ref_q, atol=1e-2, rtol=8e-3)
+    torch.testing.assert_close(k_cache[slots].flatten(1), ref_k, atol=1e-2, rtol=8e-3)
+    assert torch.equal(v_cache[slots].flatten(1), ref_v)
+
+
 def test_triton_stays_the_default_gqa_prologue() -> None:
     traits = {
         "head_dim": _HEAD_DIM,

@@ -27,6 +27,29 @@ from sgl_kernel import fused_qk_rope_with_cos_sin_cache_inplace as _sgl_rope
 from sgl_kernel import rmsnorm as _sgl_rmsnorm
 from sgl_kernel import store_cache_xpu as _sgl_store_cache
 
+# Fallback RoPE for head widths the fused kernel does not cover (e.g. 64).
+_sgl_rotary_embedding = torch.ops.sgl_kernel.rotary_embedding
+
+# rotary_embedding reads its cos/sin table in the activation dtype, so each model's
+# fp32 table is converted once, as SGLang does, and reused. The entry keeps the
+# source table alive so its address cannot be reused by another table.
+_ROPE_TABLES: dict[
+    tuple[int, tuple[int, ...], torch.dtype], tuple[torch.Tensor, torch.Tensor]
+] = {}
+
+
+def _rope_table(cos_sin_cache: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+    key = (cos_sin_cache.data_ptr(), tuple(cos_sin_cache.shape), dtype)
+    entry = _ROPE_TABLES.get(key)
+    if entry is None:
+        if torch.xpu.is_current_stream_capturing():
+            # A graph would only record the conversion, leaving the table unfilled.
+            raise RuntimeError(
+                "rotary_embedding's table must be converted before XPU graph capture"
+            )
+        entry = _ROPE_TABLES[key] = (cos_sin_cache, cos_sin_cache.to(dtype))
+    return entry[1]
+
 
 def gqa_prologue(
     q: torch.Tensor,
@@ -72,14 +95,29 @@ def gqa_prologue(
         q = _sgl_rmsnorm(q.reshape(-1, head_dim), q_weight, eps).view(num_tokens, -1)
         k = _sgl_rmsnorm(k.reshape(-1, head_dim), k_weight, eps).view(num_tokens, -1)
     if cos_sin_cache is not None:
-        _sgl_rope(
-            q.view(num_tokens, -1, head_dim),
-            k.view(num_tokens, -1, head_dim),
-            cos_sin_cache,
-            positions.long(),
-            head_dim,
-            is_neox,
-        )
+        # The same choice as SGLang's RotaryEmbedding.forward_xpu: the fused kernel
+        # covers only these widths; others take rotary_embedding, which returns new
+        # tensors instead of rotating in place.
+        if head_dim in (128, 256, 512):
+            _sgl_rope(
+                q.view(num_tokens, -1, head_dim),
+                k.view(num_tokens, -1, head_dim),
+                cos_sin_cache,
+                positions.long(),
+                head_dim,
+                is_neox,
+            )
+        else:
+            q, k = _sgl_rotary_embedding(
+                positions.long(),
+                q.view(num_tokens, -1, head_dim),
+                k.view(num_tokens, -1, head_dim),
+                head_dim,
+                _rope_table(cos_sin_cache, q.dtype),
+                is_neox,
+            )
+            q, k = q.view(num_tokens, -1), k.view(num_tokens, -1)
+
     rows = slots.numel()
     if rows:
         row_dim = k_cache.shape[1] * head_dim

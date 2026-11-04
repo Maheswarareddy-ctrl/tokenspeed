@@ -47,8 +47,8 @@ if current_platform().is_xpu:
         # the composite), so it serves only when selected explicitly.
         priority=Priority.PORTABLE,
         traits={
-            # sgl-kernel-xpu's fused RoPE supports only these head widths.
-            "head_dim": frozenset({128, 256, 512}),
+            # 128/256/512 take sgl-kernel-xpu's fused RoPE, 64 its rotary_embedding.
+            "head_dim": frozenset({64, 128, 256, 512}),
             "has_norm": BOOLS,
             "kv_format": frozenset({"native"}),
             "kv_convert": frozenset({False}),

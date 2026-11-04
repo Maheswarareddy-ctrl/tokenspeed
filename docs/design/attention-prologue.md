@@ -267,7 +267,8 @@ native, FP8 or MXFP8 cache; every step but the write is optional.
 | --- | --- | --- |
 | `triton` | one launch; each program takes a tile of tokens of one head (4 at decode sizes, up to 2048 elements past 256 tokens) | AMD and NVIDIA, native or FP8 caches |
 | `composite` | `qk_rmsnorm`, `embedding.rope`, then the cache store | everything; rounds between steps; the path for MXFP8 caches and Ascend |
-| `sycl` | sgl-kernel-xpu `rmsnorm`, `fused_qk_rope_with_cos_sin_cache_inplace`, then `store_cache` | Intel; bf16 native caches, full rotary, head_dim 128, 256 or 512; rounds between steps like SGLang's XPU path; selected only explicitly |
+| `sycl` | sgl-kernel-xpu `rmsnorm`, `fused_qk_rope_with_cos_sin_cache_inplace` (head_dim 128, 256, 512) or `rotary_embedding` (head_dim 64), then `store_cache` | Intel; bf16 native caches, full rotary, head_dim 64, 128, 256 or 512; rounds between steps like SGLang's XPU path; selected only explicitly |
+
 
 
 The tiled Triton kernel beats the CUDA `embedding.rope` with its fused K/V
